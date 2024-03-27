@@ -9,15 +9,19 @@
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 struct packet {
-  float w,i,j,k,vX,vY,vZ,X,Y,Z;
+  float tankPrs, combnPrs, force;
 } dataPacket;
+
+float randFloat(float LO, float HI) {
+    return LO + (float)(rand()) /( (float)(RAND_MAX/(HI-LO)));
+}
 
 void setup() {
   pinMode(23,OUTPUT); digitalWrite(23,HIGH);
   pinMode(22,OUTPUT); digitalWrite(22,HIGH);
 
   Serial.begin(115200);
-  // while (!Serial) delay(1); // Wait for Serial Console (comment out line if no computer)
+  // while (!Serial); // Wait for Serial Console (comment out line if no computer)
 
   digitalWrite(RFM95_RST, HIGH);
   delay(10);
@@ -32,25 +36,18 @@ void setup() {
   // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
 
   // You can change the modulation parameters with eg
-  rf95.setModemConfig(RH_RF95::Bw125Cr45Sf128);
+  rf95.setModemConfig(RH_RF95::Bw500Cr45Sf128);
 }
 
 void loop() {
- if (rf95.available()) {
-    // Should be a message for us now
-    uint8_t buf[sizeof(dataPacket)];
-    uint8_t len = sizeof(buf);
-    if (rf95.recv(buf, &len)) {
-      if (!len) return;
-      buf[len] = 0;
-      memcpy(&dataPacket,buf,sizeof(dataPacket));
 
-      Serial.print(dataPacket.w,5); Serial.print(" \t"); Serial.print(dataPacket.i,5); Serial.print(" \t"); Serial.print(dataPacket.j,5); Serial.print(" \t"); Serial.println(dataPacket.k,5);
-      // Serial.print("RSSI: ");
-      // Serial.println(rf95.lastRssi(), DEC);
 
-    } else {
-      Serial.println("Receive failed");
-    }
+  if(rf95.mode() != rf95.RHModeTx) {
+    dataPacket = (packet){randFloat(750,850),randFloat(300,500),randFloat(0,800)};
+    
+    char radiopacket[sizeof(dataPacket)];
+    memcpy(radiopacket,&dataPacket,sizeof(dataPacket));
+    rf95.send((uint8_t *)radiopacket, strlen(radiopacket));
+    Serial.print("Sent: "); Serial.print(dataPacket.tankPrs,5); Serial.print(" "); Serial.print(dataPacket.combnPrs,5); Serial.print(" "); Serial.println(dataPacket.force,5);
   }
 }
