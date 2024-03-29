@@ -12,9 +12,13 @@ struct packet {
   float tankPrs, combnPrs, force;
 } dataPacket;
 
+char radiopacket[sizeof(dataPacket)];
+
 float randFloat(float LO, float HI) {
     return LO + (float)(rand()) /( (float)(RAND_MAX/(HI-LO)));
 }
+
+uint32_t txCounter;
 
 void setup() {
   pinMode(23,OUTPUT); digitalWrite(23,HIGH);
@@ -36,18 +40,30 @@ void setup() {
   // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
 
   // You can change the modulation parameters with eg
-  rf95.setModemConfig(RH_RF95::Bw500Cr45Sf128);
+  rf95.setModemConfig(RH_RF95::Bw125Cr45Sf128);
+  txCounter = millis();
 }
 
-void loop() {
 
+void loop() {
+  Serial.print("Mode: ");
+  Serial.println(rf95.mode());
+  int dT = millis()-txCounter;
+  Serial.print("               dT: "); Serial.println((float)dT/1000.f,3);
 
   if(rf95.mode() != rf95.RHModeTx) {
-    dataPacket = (packet){randFloat(750,850),randFloat(300,500),randFloat(0,800)};
-    
-    char radiopacket[sizeof(dataPacket)];
+    dataPacket = (packet){randFloat(750,850),randFloat(300,500),randFloat(1,800)};
     memcpy(radiopacket,&dataPacket,sizeof(dataPacket));
-    rf95.send((uint8_t *)radiopacket, strlen(radiopacket));
+    rf95.send((uint8_t *)radiopacket, sizeof(radiopacket));
+    txCounter = millis();
     Serial.print("Sent: "); Serial.print(dataPacket.tankPrs,5); Serial.print(" "); Serial.print(dataPacket.combnPrs,5); Serial.print(" "); Serial.println(dataPacket.force,5);
   }
+  
+  else if(dT > 200){
+    rf95.setModeIdle();
+    Serial.println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa");
+  }
+  Serial.print("Mode: ");
+  Serial.println(rf95.mode()); Serial.println();
+  delay(10);
 }
