@@ -9,7 +9,8 @@
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 struct packet {
-  float tankPrs, combnPrs, force, timeStamp;
+  float timeStamp, tankPrs, combnPrs, force;
+  uint8_t status;
 } dataPacket;
 
 char radiopacket[sizeof(dataPacket)];
@@ -54,7 +55,7 @@ void loop() {
   float timeElapsed = (float)(millis()-time)/1000.f;
 
   if(rf95.mode() != rf95.RHModeTx) {
-    dataPacket = (packet){randFloat(750,850),randFloat(300,500),randFloat(1,800),timeElapsed};
+    dataPacket = (packet){timeElapsed,randFloat(750,850),randFloat(300,500),randFloat(1,800)};
     memcpy(radiopacket,&dataPacket,sizeof(dataPacket));
     rf95.send((uint8_t *)radiopacket, sizeof(radiopacket));
     txCounter = millis();
