@@ -35,7 +35,7 @@
 #define RH_DEFAULT_TIMEOUT 200
 
 /// The default number of retries
-#define RH_DEFAULT_RETRIES 0
+#define RH_DEFAULT_RETRIES 3
 
 /////////////////////////////////////////////////////////////////////
 /// \class RHReliableDatagram RHReliableDatagram.h <RHReliableDatagram.h>

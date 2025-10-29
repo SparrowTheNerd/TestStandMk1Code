@@ -1,12 +1,10 @@
-#define PY1 14
-#define PY2 13
-#define PY3 12
-#define PY4 18
+#define PY1 PA3
+
 #define BZR 15
 
-#define CS_LoRa 21
-#define RST_LoRa 1
-#define INT_LoRa INT2
+#define CS_LoRa PB2
+#define RST_LoRa PB11
+#define INT_LoRa digitalPinToInterrupt(PB10)
 
 #define CS_SD 22
 
