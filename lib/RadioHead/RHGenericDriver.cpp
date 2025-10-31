@@ -4,6 +4,7 @@
 // $Id: RHGenericDriver.cpp,v 1.24 2020/01/07 23:35:02 mikem Exp $
 
 #include <RHGenericDriver.h>
+#include <STM32FreeRTOS.h>
 
 RHGenericDriver::RHGenericDriver()
     :
@@ -29,11 +30,10 @@ bool RHGenericDriver::init()
 void RHGenericDriver::waitAvailable(uint16_t polldelay)
 {
     while (!available())
-      {
-	YIELD;
-	if (polldelay)
-	  delay(polldelay);
-      }
+    {
+        if (polldelay) {vTaskDelay(polldelay / portTICK_PERIOD_MS);}
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
 }
 
 // Blocks until a valid message is received or timeout expires
@@ -48,9 +48,8 @@ bool RHGenericDriver::waitAvailableTimeout(uint16_t timeout, uint16_t polldelay)
 	{
            return true;
 	}
-	YIELD;
-	if (polldelay)
-	  delay(polldelay);
+	if (polldelay) {vTaskDelay(polldelay / portTICK_PERIOD_MS);}
+    vTaskDelay(10 / portTICK_PERIOD_MS);
     }
     return false;
 }
@@ -58,7 +57,7 @@ bool RHGenericDriver::waitAvailableTimeout(uint16_t timeout, uint16_t polldelay)
 bool RHGenericDriver::waitPacketSent()
 {
     while (_mode == RHModeTx)
-	YIELD; // Wait for any previous transmit to finish
+	taskYIELD(); // Wait for any previous transmit to finish
     return true;
 }
 
@@ -69,7 +68,7 @@ bool RHGenericDriver::waitPacketSent(uint16_t timeout)
     {
         if (_mode != RHModeTx) // Any previous transmit finished?
            return true;
-	YIELD;
+	taskYIELD();
     }
     return false;
 }
@@ -91,9 +90,9 @@ bool RHGenericDriver::waitCAD()
          if (millis() - t > _cad_timeout) 
 	     return false;
 #if (RH_PLATFORM == RH_PLATFORM_STM32) // stdlib on STMF103 gets confused if random is redefined
-	 delay(_random(1, 10) * 100);
+	 vTaskDelay(_random(1, 10) * 100 / portTICK_PERIOD_MS);
 #else
-         delay(random(1, 10) * 100); // Should these values be configurable? Macros?
+         vTaskDelay(random(1, 10) * 100 / portTICK_PERIOD_MS); // Should these values be configurable? Macros?
 #endif
     }
 

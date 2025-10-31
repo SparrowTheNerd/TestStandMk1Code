@@ -12,6 +12,7 @@
 // $Id: RHReliableDatagram.cpp,v 1.18 2018/11/08 02:31:43 mikem Exp $
 
 #include <RHReliableDatagram.h>
+#include <STM32FreeRTOS.h>
 
 ////////////////////////////////////////////////////////////////////
 // Constructors
@@ -115,10 +116,10 @@ bool RHReliableDatagram::sendtoWait(uint8_t* buf, uint8_t len, uint8_t address)
 		}
 	    }
 	    // Not the one we are waiting for, maybe keep waiting until timeout exhausted
-	    YIELD;
+	    taskYIELD();
 	}
 	// Timeout exhausted, maybe retry
-	YIELD;
+	taskYIELD();
     }
     // Retries exhausted
     return false;
@@ -146,7 +147,7 @@ bool RHReliableDatagram::recvfromAck(uint8_t* buf, uint8_t* len, uint8_t* from, 
 		// a fast processor should wait a little before sending the acknowledge message
 		unsigned long ts = millis();
 		while ((millis() - ts) <= RH_ACK_DELAY)
-		    YIELD;
+		    taskYIELD();
                 #endif
 
 	        // Its for this node and
@@ -187,7 +188,7 @@ bool RHReliableDatagram::recvfromAckTimeout(uint8_t* buf, uint8_t* len, uint16_t
 	    if (recvfromAck(buf, len, from, to, id, flags))
 		return true;
 	}
-	YIELD;
+	taskYIELD();
     }
     return false;
 }

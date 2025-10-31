@@ -1,3 +1,13 @@
 {
-    "cmake.configureOnOpen": false
+    "cmake.configureOnOpen": false,
+    "files.associations": {
+        "usbd_desc.h": "c",
+        "usbd_cdc_if.h": "c",
+        "exception": "cpp",
+        "memory_resource": "cpp",
+        "iosfwd": "cpp",
+        "new": "cpp",
+        "ostream": "cpp",
+        "streambuf": "cpp"
+    }
 }

@@ -6,17 +6,12 @@
 #include <RHReliableDatagram.h>
 #include "pindefs.h"
 
-#define CS PC2
-#define INT PC12
-
 #define CLIENT_ADDRESS 17
 #define SERVER_ADDRESS 41
 
 RHHardwareSPI spi;
 RH_RF95 rf95(CS_LoRa, INT_LoRa, spi);
 RHReliableDatagram manager(rf95, CLIENT_ADDRESS);
-
-uint32_t startTime;
 
 void Radio::init() {
    pinMode(CS_LoRa, OUTPUT);
@@ -25,14 +20,14 @@ void Radio::init() {
    pinModeAF(PA7,GPIO_AF5_SPI1); SPI.setMOSI(PA7);
    pinModeAF(PA5,GPIO_AF5_SPI1); SPI.setSCLK(PA5);
    // spi.setFrequency(RHGenericSPI::Frequency8MHz);
-   SPI.setClockDivider(SPI_CLOCK_DIV16);
+   SPI.setClockDivider(SPI_CLOCK_DIV8);
    SPI.begin();
    
 
    // rf95.init();
    manager.init();
-   rf95.setFrequency(924); //set frequency to 915MHz
-   rf95.setTxPower(20,false); //set the transmit power to 20dBm using PA_BOOST
+   rf95.setFrequency(915); //set frequency to 915MHz
+   rf95.setTxPower(0,false); //set the transmit power to 20dBm using PA_BOOST
    rf95.setModemConfig(RH_RF95::Bw500Cr45Sf128);
    Serial.println("Radio initialized");
 }
@@ -40,9 +35,10 @@ void Radio::init() {
 uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
 uint32_t nackFreq = 0;
 
-uint8_t Radio::tx(uint8_t* dataPacket) {
+uint8_t Radio::tx() {
    uint8_t len = sizeof(buf);
    uint8_t from;
+   nackFreq++;
    if (!manager.sendtoWait((uint8_t *)&dataPacket, sizeof(dataPacket), SERVER_ADDRESS))
    {
       Serial.println("NACK");

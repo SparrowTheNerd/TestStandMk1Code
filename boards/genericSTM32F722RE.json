@@ -1,0 +1,42 @@
+{
+  "build": {
+    "cpu": "cortex-m7",
+    "extra_flags": "-DSTM32F7 -DSTM32F722xx",
+    "f_cpu": "192000000L",
+    "mcu": "stm32f722ret6",
+    "product_line": "STM32F722xx",
+    "variant": "STM32F7xx/F722R(C-E)T_F730R8T_F732RET"
+  },
+  "connectivity": [
+    "can"
+  ],
+  "debug": {
+    "default_tools": [
+      "stlink"
+    ],
+    "jlink_device": "STM32F722RE",
+    "onboard_tools": [
+      "stlink"
+    ],
+    "openocd_board": "st_nucleo_f7",
+    "openocd_target": "stm32f7x",
+    "svd_path": "STM32F722.svd"
+  },
+  "frameworks": [
+    "arduino",
+    "cmsis",
+    "stm32cube",
+    "libopencm3"
+  ],
+  "name": "ST Generic F722RE",
+  "upload": {
+    "maximum_ram_size": 262144,
+    "maximum_size": 524288,
+    "protocol": "stlink",
+    "protocols": [
+      "stlink"
+    ]
+  },
+  "url": "https://www.st.com/en/evaluation-tools/nucleo-f722ze.html",
+  "vendor": "ST"
+}

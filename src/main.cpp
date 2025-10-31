@@ -1,95 +1,161 @@
 #include <Arduino.h>
 #include <pindefs.h>
+#include <STM32FreeRTOS.h>
 #include <SPI.h>
-#include <RH_RF95.h>
-#include <RHReliableDatagram.h>
 #include <HX711.h>
 #include "Radio/Radio.h"
-
-
+#include <Servo.h>
 
 HX711 loadcell;
 Radio radio;
+Servo servo1;
 
 bool armStatus = false;
 bool qdStatus = false;
 bool igniterStatus = false;
 
-struct packet {
-  float timeStamp, tankPrs, combnPrs, force;
-  uint8_t status;
-  //2^5 can store 0-31. Use (0,25) as raw percentage, then (26,31) represent subsequent 12.5% increments to 100%
-  //the remaining 3 bits can be used for arming status, QD status, and igniter continuity
-} dataPacket;
-
 float randFloat(float LO, float HI) {
     return LO + (float)(rand()) /( (float)(RAND_MAX/(HI-LO)));
 }
 
-uint32_t Time;
+SemaphoreHandle_t xSerialSemaphore;
 
-void setup() {
-  pinMode(CS_SD,OUTPUT); digitalWrite(CS_SD,HIGH);
-  pinMode(CS_LoRa, OUTPUT); digitalWrite(CS_LoRa,HIGH);
-  pinMode(PY1, OUTPUT); digitalWrite(PY1,LOW);
+uint32_t startTime, servoTimer, servoStart = 0;
 
-  Serial.begin(115200);
-  // while (!Serial); // Wait for Serial Console (comment out line if no computer)
-  Time = millis();
-  radio.init();
-
-  // loadcell.begin(25,24);
-  // loadcell.tare(20);
-}
 
 const float voltsPerBit = 0.000000002384185791015625;
 
 uint8_t status, valvePos, valveBits;
 
+bool servoOn = false;
+
+void TaskRadio(void *pvParameters);
+void TaskData(void *pvParameters);
+void TaskServo(void *pvParameters);
+
+void setup() {
+  // pinMode(PY1, OUTPUT); digitalWrite(PY1,LOW);
+  pinMode(CONT, INPUT);
+  SerialUSB.begin();
+  // while (!Serial); // Wait for Serial Console (comment out line if no computer)
+  startTime = millis();
+
+  xTaskCreate(
+    TaskRadio
+    ,  "Radio Task"   // A name just for humans
+    ,  512  // This stack size can be checked & adjusted by reading Highwater
+    ,  NULL
+    ,  1  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+    ,  NULL );
+  xTaskCreate(
+    TaskData
+    ,  "Data Task"   // A name just for humans
+    ,  512  // This stack size can be checked & adjusted by reading Highwater
+    ,  NULL
+    ,  3  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+    ,  NULL );
+  xTaskCreate(
+    TaskServo
+    ,  "Servo Task"   // A name just for humans
+    ,  512  // This stack size can be checked & adjusted by reading Highwater
+    ,  NULL
+    ,  2  // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
+    ,  NULL );
+  vTaskStartScheduler();
+  Serial.println("Insufficient RAM");
+  while(1);
+}
+
+float timeElapsed;
+
+/* ===== TASKS ===== */
+
+void TaskRadio(void *pvParameters __attribute__((unused))) {
+  radio.init();
+  for(;;) {
+    timeElapsed = (float)(millis()-startTime)/1000.f;
+    // dataPacket = (packet){timeElapsed,randFloat(750,850),randFloat(300,500),randFloat(1,800),status};
+    // dataPacket = (packet){100.f,800.f,400.f,300.f,1};
+    radio.dataPacket = (Radio::packet){timeElapsed,randFloat(750,850),randFloat(300,500),randFloat(1,800),status};
+    uint8_t cmd = radio.tx();
+
+    switch (cmd) {
+      case 'F':
+        if (armStatus) {
+          Serial.println("FIRING COMMAND");
+          digitalWrite(PY1,HIGH);
+          delay(50);
+          digitalWrite(PY1,LOW);
+          armStatus = false;
+        }
+        break;
+      case 'A':
+        armStatus = !armStatus;
+        Serial.println("ARM COMMAND");
+        break;
+      case '1':
+        Serial.println("Fill state command");
+        break;
+      case '2':
+        Serial.println("Hold state command");
+        break;
+      case '3':
+        Serial.println("Firing/safe command");
+        break;
+      default:
+        break;
+    }
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+  }
+}
+void TaskData(void *pvParameters __attribute__((unused))) {
+  loadcell.begin(25,24);
+  loadcell.tare(20);
+  
+  for(;;) {
+    valvePos = 0;
+    if(valvePos > 25 && valvePos < 95) {
+        valveBits = 25 + (uint8_t)((valvePos - 25)/12.5); //2^5 can store 0-31. Use (0,25) as raw percentage, then (26,31) represent 6 12.5% increments to 100%
+    } else if (valvePos > 95) {
+      valveBits = 31;
+    } else { valveBits = valvePos; }
+    igniterStatus = digitalRead(CONT);
+    // if (loadcell.wait_ready_timeout(1000)) {
+    //   long reading = loadcell.read();
+    //   Serial.println(reading);
+    // } else {
+    //   Serial.println("HX711 not found.");
+    // }
+    // long reading = loadcell.read();
+    // // Serial.println(reading);
+    // float volts = (float)reading*voltsPerBit;
+    // float kgs = 1000.f * volts / 0.02;
+    // Serial.println(kgs-2,3);
+    // delay(5);
+
+    status = valveBits << 3;
+    status |= (igniterStatus | (armStatus << 1) | (qdStatus << 2));
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+  }
+}
+
+void TaskServo(void *pvParameters __attribute__((unused))) {
+  servo1.attach(SERVO1); servo1.write(90); //stationary
+
+  for(;;) {
+    if(servoOn) {
+      servo1.write(0); //move CCW
+      servoOn = false;
+    } else {
+      servo1.write(180); //move CW
+      servoOn = true;
+    }
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+}
+
 void loop() {
-  float timeElapsed = (float)(millis()-Time)/1000.f;
-
-  valvePos = 0;
-  if(valvePos > 25 && valvePos < 95) {
-      valveBits = 25 + (uint8_t)((valvePos - 25)/12.5); //2^5 can store 0-31. Use (0,25) as raw percentage, then (26,31) represent 6 12.5% increments to 100%
-  } else if (valvePos > 95) {
-    valveBits = 31;
-  } else { valveBits = valvePos; }
-
-  // if (loadcell.wait_ready_timeout(1000)) {
-  //   long reading = loadcell.read();
-  //   Serial.println(reading);
-  // } else {
-  //   Serial.println("HX711 not found.");
-  // }
-  // long reading = loadcell.read();
-  // // Serial.println(reading);
-  // float volts = (float)reading*voltsPerBit;
-  // float kgs = 1000.f * volts / 0.02;
-  // Serial.println(kgs-2,3);
-  // delay(5);
-
-  status = valveBits << 3;
-  status |= (igniterStatus | (armStatus << 1) | (qdStatus << 2));
-  // dataPacket = (packet){timeElapsed,randFloat(750,850),randFloat(300,500),randFloat(1,800),status};
-  // dataPacket = (packet){100.f,800.f,400.f,300.f,1};
-  dataPacket = (packet){timeElapsed,0.f,0.f,0.f,status};
-
-  uint8_t cmd = radio.tx((uint8_t *)&dataPacket);
-
-  if(cmd == 'F' && armStatus) {
-    Serial.println("FIRING COMMAND");
-    digitalWrite(PY1,HIGH);
-    delay(50);
-    digitalWrite(PY1,LOW);
-    armStatus = false;
-  }
-  else if(cmd == 'A') {
-    armStatus = !armStatus;
-    Serial.println("ARM COMMAND");
-  }
-
-  delay(50);
+  // Empty. Things are done in Tasks.
 }
 
 void SystemClock_Config(void)
